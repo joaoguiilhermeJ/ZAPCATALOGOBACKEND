@@ -9,13 +9,14 @@ import config from './config/index.js';
 import apiRoutes from './routes/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import paymentDb from './services/paymentDb.js';
+import { ensureCatalogTables, ensureUserTables } from './services/db.js';
 
 const app = express();
 
 // ── Middlewares globais ──
 app.use(cors({ origin: config.cors.origin }));
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // ── API REST ──
 app.use('/api', apiRoutes);
@@ -29,27 +30,29 @@ app.get('/api/health', (_req, res) => {
 app.use(errorHandler);
 
 // ── Inicialização ──
-const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
+const PORT = config.port;
 
-if (!isVercel) {
-  // Inicializa tabelas no banco
-  paymentDb.init()
-    .then(() => {
-      app.listen(config.port, () => {
-        console.log(`
+// Inicializa tabelas no banco
+Promise.all([
+    paymentDb.init(),
+    ensureCatalogTables(),
+    ensureUserTables(),
+  ])
+  .then(() => {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`
   ╔═══════════════════════════════════════════╗
   ║        ZapCatálogo  API (backend)         ║
   ╠═══════════════════════════════════════════╣
-  ║  🚀  http://localhost:${String(config.port).padEnd(30)}║
+  ║  🚀  Porta: ${String(PORT).padEnd(35)}║
   ║  📁  Modo: ${config.env.padEnd(35)}║
   ╚═══════════════════════════════════════════╝
-        `);
-      });
-    })
-    .catch((err) => {
-      console.error('[DB] Erro ao inicializar banco:', err.message);
-      process.exit(1);
+      `);
     });
-}
+  })
+  .catch((err) => {
+    console.error('[DB] Erro ao inicializar banco:', err.message);
+    process.exit(1);
+  });
 
 export default app;

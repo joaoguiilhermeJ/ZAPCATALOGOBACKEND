@@ -9,6 +9,7 @@ import config from '../src/config/index.js';
 import apiRoutes from '../src/routes/index.js';
 import { errorHandler } from '../src/middleware/errorHandler.js';
 import paymentDb from '../src/services/paymentDb.js';
+import { ensureCatalogTables, ensureUserTables } from '../src/services/db.js';
 
 const app = express();
 
@@ -25,7 +26,11 @@ app.get('/api/health', (_req, res) => {
 app.use(errorHandler);
 
 // Inicializa tabelas
-paymentDb.init().catch((err) => {
+Promise.all([
+  paymentDb.init(),
+  ensureCatalogTables(),
+  ensureUserTables(),
+]).catch((err) => {
   console.error('[DB] Erro ao inicializar banco:', err.message);
 });
 

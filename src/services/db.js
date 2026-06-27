@@ -63,4 +63,63 @@ export async function ensureTables() {
   console.log('[DB] Tabela "payments" garantida');
 }
 
-export default { query, testConnection, ensureTables };
+/**
+ * Cria a tabela de catálogos + produtos se não existir
+ */
+export async function ensureCatalogTables() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS catalogos (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      nome_loja TEXT NOT NULL,
+      slug TEXT UNIQUE NOT NULL,
+      whatsapp TEXT,
+      cor_tema TEXT DEFAULT '#128C7E',
+      logo_url TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS produtos (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      catalogo_id UUID NOT NULL REFERENCES catalogos(id) ON DELETE CASCADE,
+      nome TEXT NOT NULL,
+      descricao TEXT,
+      preco TEXT,
+      categoria TEXT,
+      codigo TEXT,
+      estoque TEXT,
+      imagem_url TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_produtos_catalogo_id ON produtos(catalogo_id);
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_catalogos_slug ON catalogos(slug);
+  `);
+
+  console.log('[DB] Tabelas "catalogos" e "produtos" garantidas');
+}
+
+/**
+ * Cria a tabela de usuários se não existir
+ */
+export async function ensureUserTables() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS usuarios (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      email TEXT UNIQUE NOT NULL,
+      senha_hash TEXT NOT NULL,
+      nome TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+  console.log('[DB] Tabela "usuarios" garantida');
+}
+
+export default { query, testConnection, ensureTables, ensureCatalogTables, ensureUserTables };
