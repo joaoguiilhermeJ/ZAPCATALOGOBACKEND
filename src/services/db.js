@@ -103,6 +103,18 @@ export async function ensureCatalogTables() {
     CREATE INDEX IF NOT EXISTS idx_catalogos_slug ON catalogos(slug);
   `);
 
+  // Migration: adiciona usuario_id se não existir
+  await query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'catalogos' AND column_name = 'usuario_id'
+      ) THEN
+        ALTER TABLE catalogos ADD COLUMN usuario_id UUID REFERENCES usuarios(id) ON DELETE SET NULL;
+      END IF;
+    END $$;
+  `);
+
   console.log('[DB] Tabelas "catalogos" e "produtos" garantidas');
 }
 

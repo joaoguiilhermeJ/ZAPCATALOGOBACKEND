@@ -33,11 +33,11 @@ app.use(errorHandler);
 const PORT = config.port;
 
 // Inicializa tabelas no banco
-Promise.all([
-    paymentDb.init(),
-    ensureCatalogTables(),
-    ensureUserTables(),
-  ])
+;(async function initDB() {
+    await paymentDb.init();
+    await ensureUserTables();
+    await ensureCatalogTables();
+  })()
   .then(() => {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`
