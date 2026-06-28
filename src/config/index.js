@@ -2,23 +2,28 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 // Suporta múltiplas origens separadas por vírgula no CORS_ORIGIN
 const corsOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
-  : ['http://localhost:3000'];
+  : (isProduction ? [] : ['http://localhost:3000']);
 
-// Em produção (Render), permite qualquer origem do frontend
-// O CORS_ORIGIN deve conter a URL do frontend (ex: https://zapcatalogo.vercel.app)
-// Se FRONTEND_URL for definida, ela é automaticamente adicionada às origens permitidas
+// Se FRONTEND_URL for definida, adiciona automaticamente
 if (process.env.FRONTEND_URL && !corsOrigins.includes(process.env.FRONTEND_URL)) {
   corsOrigins.push(process.env.FRONTEND_URL);
 }
+
+// Em produção sem CORS configurado, reflete a origem (seguro para MVP)
+const corsOrigin = corsOrigins.length > 0
+  ? corsOrigins
+  : true; // true = reflete a origem da requisicao (equivalente a permitir qualquer origem)
 
 export default {
   port: process.env.PORT || 3001,
   env: process.env.NODE_ENV || 'development',
   cors: {
-    origin: corsOrigins,
+    origin: corsOrigin,
   },
   upload: {
     maxSize: parseInt(process.env.MAX_FILE_SIZE || '10485760', 10),
