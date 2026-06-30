@@ -13,7 +13,7 @@ import exceljs from 'exceljs';
 import { query } from '../services/db.js';
 import { AppError } from '../middleware/errorHandler.js';
 
-const LOJISTA_TESTE_ID = '00000000-0000-0000-0000-000000000001';
+const LOJISTA_TESTE_ID = '00000000-0000-0000-0000-000000000001'; // kept for legacy fallback
 const CATALOGO_TESTE_ID = '00000000-0000-0000-0000-000000000001';
 
 export class ProdutoUploadController {
@@ -149,10 +149,19 @@ export class ProdutoUploadController {
       }
 
       // Salva no banco atrelado ao catálogo de teste
-      await this.ensureTestSeed();
+      // Usa o catálogo informado (slug ou id) – o cliente deve enviar catalogId no body
+      const catalogId = req.body.catalogId;
+      if (!catalogId) {
+        throw new AppError('catalogId ausente no corpo da requisição', 400);
+      }
+      // Verifica se o catalogo existe
+      const catalogCheck = await query('SELECT id FROM catalogos WHERE id = $1', [catalogId]);
+      if (!catalogCheck.rowCount) {
+        throw new AppError('Catálogo não encontrado para o catalogId fornecido', 404);
+      }
 
-      // Apaga produtos antigos do catálogo teste (se houver)
-      await query('DELETE FROM produtos WHERE catalogo_id = $1', [CATALOGO_TESTE_ID]);
+      // Apaga produtos antigos do catálogo (se houver)
+      await query('DELETE FROM produtos WHERE catalogo_id = $1', [catalogId]);
 
       // Insere lote
       const values = [];
@@ -162,7 +171,7 @@ export class ProdutoUploadController {
       for (const p of produtos) {
         placeholders.push(`($${idx}, $${idx+1}, $${idx+2}, $${idx+3}, $${idx+4}, $${idx+5}, $${idx+6})`);
         values.push(
-          CATALOGO_TESTE_ID,
+          catalogId,
           p.nome,
           p.descricao || null,
           p.preco || null,
