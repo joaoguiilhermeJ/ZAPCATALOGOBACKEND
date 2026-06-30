@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 import catalogoDb from '../services/catalogoDb.js';
 import supabaseStorage from '../services/supabaseStorage.js';
 import { AppError } from '../middleware/errorHandler.js';
-import prisma from '../services/prisma.js'; // assume there is a prisma export
+// import prisma from '../services/prisma.js'; // removed – not used
 
 export class OnboardingController {
   /**
@@ -36,15 +36,12 @@ export class OnboardingController {
       }
 
       // transação atômica: cria catálogo e define logo_url se houver
-      const created = await prisma.$transaction(async (tx) => {
-        const cat = await catalogoDb.CatalogoDb.create({
-          nome_loja: nome_loja.trim(),
-          slug,
-          whatsapp,
-          cor_tema,
-          logo_url: logoUrl,
-        }, tx);
-        return cat;
+      const created = await catalogoDb.CatalogoDb.create({
+        nome_loja: nome_loja.trim(),
+        slug,
+        whatsapp,
+        cor_tema,
+        logo_url: logoUrl,
       });
 
       res.status(201).json({
