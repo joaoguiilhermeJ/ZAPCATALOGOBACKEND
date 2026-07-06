@@ -12,6 +12,7 @@
 import exceljs from 'exceljs';
 import { query } from '../services/db.js';
 import { AppError } from '../middleware/errorHandler.js';
+import supabaseStorage from '../services/supabaseStorage.js';
 
 const LOJISTA_TESTE_ID = '00000000-0000-0000-0000-000000000001'; // kept for legacy fallback
 const CATALOGO_TESTE_ID = '00000000-0000-0000-0000-000000000001';
@@ -182,9 +183,10 @@ export class ProdutoUploadController {
         idx += 7;
       }
 
-      await query(
+      const inserted = await query(
         `INSERT INTO produtos (catalogo_id, nome, descricao, preco, categoria, codigo, estoque)
-         VALUES ${placeholders.join(', ')}`,
+         VALUES ${placeholders.join(', ')}
+         RETURNING *`,
         values
       );
 
@@ -195,10 +197,52 @@ export class ProdutoUploadController {
         filename,
         totalLinhas,
         linhasValidas,
-        produtos,
+        produtos: inserted.rows,
         count: produtos.length,
       });
 
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/produtos/:id/imagem — associa uma imagem a um produto.
+   */
+  async uploadImagem(req, res, next) {
+    try {
+      if (!req.file) {
+        throw new AppError('Envie uma imagem no campo "imagem"', 400);
+      }
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.params.id)) {
+        throw new AppError('ID de produto inválido', 400);
+      }
+
+      const productResult = await query(
+        'SELECT id, catalogo_id FROM produtos WHERE id = $1',
+        [req.params.id]
+      );
+      const produto = productResult.rows[0];
+      if (!produto) {
+        throw new AppError('Produto não encontrado', 404);
+      }
+
+      const uploaded = await supabaseStorage.uploadProductImage(
+        produto.catalogo_id,
+        produto.id,
+        req.file.buffer,
+        req.file.mimetype
+      );
+      if (!uploaded.publicUrl) {
+        throw new AppError('Não foi possível enviar a imagem do produto. Tente novamente.', 503);
+      }
+
+      await query(
+        'UPDATE produtos SET imagem_url = $1, imagem_updated_at = NOW() WHERE id = $2',
+        [uploaded.publicUrl, produto.id]
+      );
+
+      res.json({ success: true, imagem_url: uploaded.publicUrl });
     } catch (error) {
       next(error);
     }

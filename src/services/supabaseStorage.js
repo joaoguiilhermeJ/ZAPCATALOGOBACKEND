@@ -61,7 +61,7 @@ export class SupabaseStorageService {
    * @returns {Promise<{publicUrl: string|null}>}
    */
   async uploadProductImage(
-    catalogoId,
+    _catalogoId,
     produtoId,
     buffer,
     mimetype = "image/jpeg",
@@ -75,7 +75,7 @@ export class SupabaseStorageService {
       "image/webp": ".webp",
     };
     const ext = extMap[mimetype] || ".jpg";
-    const filePath = `${catalogoId}/${produtoId}${ext}`;
+    const filePath = `produtos/${produtoId}-${Date.now()}${ext}`;
     const { error } = await sb.storage
       .from(bucket)
       .upload(filePath, buffer, {

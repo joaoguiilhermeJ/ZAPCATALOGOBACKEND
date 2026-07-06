@@ -5,12 +5,28 @@
 import { Router } from 'express';
 import multer from 'multer';
 import produtoUploadController from '../controllers/produtoUploadController.js';
+import { AppError } from '../middleware/errorHandler.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, callback) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.mimetype)) {
+      return callback(new AppError('Formato inválido. Use JPG, PNG ou WebP.', 400));
+    }
+    callback(null, true);
+  },
+});
 
 router.post('/produtos/upload', upload.single('file'), (req, res, next) =>
   produtoUploadController.upload(req, res, next)
+);
+
+router.post('/produtos/:id/imagem', imageUpload.single('imagem'), (req, res, next) =>
+  produtoUploadController.uploadImagem(req, res, next)
 );
 
 router.get('/produtos/ultimos', (req, res, next) =>

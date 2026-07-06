@@ -91,12 +91,17 @@ export async function ensureCatalogTables() {
       codigo TEXT,
       estoque TEXT,
       imagem_url TEXT,
+      imagem_updated_at TIMESTAMP,
       created_at TIMESTAMP DEFAULT NOW()
     );
   `);
 
   await query(`
     CREATE INDEX IF NOT EXISTS idx_produtos_catalogo_id ON produtos(catalogo_id);
+  `);
+
+  await query(`
+    ALTER TABLE produtos ADD COLUMN IF NOT EXISTS imagem_updated_at TIMESTAMP;
   `);
 
   await query(`
