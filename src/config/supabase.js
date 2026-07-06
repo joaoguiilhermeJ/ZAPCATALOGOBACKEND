@@ -1,31 +1,34 @@
-// src/config/supabase.js
-// Supabase client singleton – backend only (Service Role key)
-// WARNING: This file is never bundled for the frontend; it lives only on the server (Render).
-
+// Cliente Supabase singleton — uso exclusivo do backend.
+import "dotenv/config";
 import ws from "ws";
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY; // service_role key – keep secret!
+const supabaseUrl = process.env.SUPABASE_URL?.trim();
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY?.trim();
+const missingVariables = [
+  !supabaseUrl && "SUPABASE_URL",
+  !supabaseServiceKey && "SUPABASE_SERVICE_KEY",
+].filter(Boolean);
 
-let supabase = null;
-
-export function getSupabaseClient() {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-    console.warn("[Supabase] SUPABASE_URL or SUPABASE_SERVICE_KEY not set");
+function initializeSupabase() {
+  if (missingVariables.length) {
+    console.warn(
+      `[Supabase] Configuração incompleta: ${missingVariables.join(", ")}. Uploads de imagens ficarão desabilitados.`,
+    );
     return null;
   }
 
-  if (!globalThis.WebSocket) {
-    globalThis.WebSocket = ws;
-  }
+  if (!globalThis.WebSocket) globalThis.WebSocket = ws;
 
-  if (!supabase) {
-    supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-      auth: { persistSession: false },
-    });
-  }
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+export const supabase = initializeSupabase();
+
+export function getSupabaseClient() {
   return supabase;
 }
 
-export default getSupabaseClient();
+export default supabase;

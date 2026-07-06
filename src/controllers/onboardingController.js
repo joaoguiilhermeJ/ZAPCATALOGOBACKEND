@@ -35,6 +35,12 @@ export class OnboardingController {
         const buffer = logoFile.buffer;
         const mimetype = logoFile.mimetype || "image/png";
         const result = await supabaseStorage.uploadLogo(slug, buffer, mimetype);
+        if (!result.publicUrl) {
+          throw new AppError(
+            "Não foi possível enviar a imagem da loja. Tente novamente.",
+            503,
+          );
+        }
         logoUrl = result.publicUrl;
       }
 

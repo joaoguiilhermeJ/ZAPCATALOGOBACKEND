@@ -1,34 +1,17 @@
 /**
  * SupabaseStorage — Upload e gerenciamento de imagens no Supabase Storage
  *
- * Buckets esperados:
- *   - "logos"   → logos/{catalogoId}/logo.png
- *   - "produtos" → produtos/{catalogoId}/{produtoId}.jpg
+ * Bucket público configurado por SUPABASE_BUCKET (padrão: "prdutos").
  */
 
 import supabase from "../config/supabase.js";
-import { createClient } from "@supabase/supabase-js";
-
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-
-let client = null;
 
 function getClient() {
-  // Reuse the singleton exported by config/supabase.js if available
-  if (supabase) return supabase;
+  return supabase;
+}
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-    console.warn(
-      "[Supabase] SUPABASE_URL ou SUPABASE_SERVICE_KEY não configurados",
-    );
-    return null;
-  }
-
-  if (!client) {
-    client = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-  }
-  return client;
+function getBucket() {
+  return process.env.SUPABASE_BUCKET || "prdutos";
 }
 
 export class SupabaseStorageService {
@@ -43,9 +26,10 @@ export class SupabaseStorageService {
     const sb = getClient();
     if (!sb) return { publicUrl: null };
 
-    const filePath = `${catalogoId}/logo.png`;
+    const filePath = `logos/${catalogoId}/logo.png`;
+    const bucket = getBucket();
 
-    const { error } = await sb.storage.from("logos").upload(filePath, buffer, {
+    const { error } = await sb.storage.from(bucket).upload(filePath, buffer, {
       contentType: mimetype || "image/png",
       upsert: true,
     });
@@ -55,7 +39,7 @@ export class SupabaseStorageService {
       return { publicUrl: null };
     }
 
-    const { data } = sb.storage.from("logos").getPublicUrl(filePath);
+    const { data } = sb.storage.from(bucket).getPublicUrl(filePath);
     return { publicUrl: data.publicUrl };
   }
 
@@ -66,7 +50,9 @@ export class SupabaseStorageService {
     const sb = getClient();
     if (!sb) return;
 
-    await sb.storage.from("logos").remove([`${catalogoId}/logo.png`]);
+    await sb.storage
+      .from(getBucket())
+      .remove([`logos/${catalogoId}/logo.png`]);
   }
 
   /**
@@ -89,9 +75,10 @@ export class SupabaseStorageService {
     };
     const ext = extMap[mimetype] || ".jpg";
     const filePath = `${catalogoId}/${produtoId}${ext}`;
+    const bucket = getBucket();
 
     const { error } = await sb.storage
-      .from("produtos")
+      .from(bucket)
       .upload(filePath, buffer, {
         contentType: mimetype || "image/jpeg",
         upsert: true,
@@ -105,7 +92,7 @@ export class SupabaseStorageService {
       return { publicUrl: null };
     }
 
-    const { data } = sb.storage.from("produtos").getPublicUrl(filePath);
+    const { data } = sb.storage.from(bucket).getPublicUrl(filePath);
     return { publicUrl: data.publicUrl };
   }
 
@@ -142,7 +129,7 @@ export class SupabaseStorageService {
 
     // Tenta .jpg e .png (não sabemos qual extensão foi usada)
     await sb.storage
-      .from("produtos")
+      .from(getBucket())
       .remove([
         `${catalogoId}/${produtoId}.jpg`,
         `${catalogoId}/${produtoId}.png`,
