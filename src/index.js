@@ -44,6 +44,20 @@ try {
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
+// ── Health Check ──
+const healthCheck = (_req, res) => {
+  res.json({
+    status: "online",
+    service: "ZapCatálogo API",
+    environment: config.env,
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+};
+
+app.get("/health", healthCheck);
+app.get("/api/health", healthCheck);
+
 // ── API REST ──
 // Rota explícita para compatibilidade: garante existência de /api/loja/:slug
 app.get("/api/loja/:slug", (req, res, next) =>
@@ -51,11 +65,6 @@ app.get("/api/loja/:slug", (req, res, next) =>
 );
 
 app.use("/api", apiRoutes);
-
-// ── Health Check ──
-app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", uptime: process.uptime() });
-});
 
 // ── Tratamento global de erros ──
 app.use(errorHandler);
