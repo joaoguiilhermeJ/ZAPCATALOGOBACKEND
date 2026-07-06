@@ -3,27 +3,58 @@
  * Ponto de entrada da API para deploy no Render
  */
 
-import express from 'express';
-import cors from 'cors';
-import config from './config/index.js';
-import apiRoutes from './routes/index.js';
-import { errorHandler } from './middleware/errorHandler.js';
-import paymentDb from './services/paymentDb.js';
-import { ensureCatalogTables, ensureUserTables } from './services/db.js';
+import express from "express";
+import cors from "cors";
+import config from "./config/index.js";
+import apiRoutes from "./routes/index.js";
+import lojaController from "./controllers/lojaController.js";
+import { errorHandler } from "./middleware/errorHandler.js";
+import paymentDb from "./services/paymentDb.js";
+import { ensureCatalogTables, ensureUserTables } from "./services/db.js";
 
 const app = express();
 
 // ── Middlewares globais ──
-app.use(cors({ origin: config.cors.origin }));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Ajuste de CORS: garante que a origem da Vercel esteja permitida em produção
+const defaultVercelOrigin = "https://zapcatalogo-weld.vercel.app";
+let corsOption = config.cors.origin;
+try {
+  if (corsOption === true) {
+    // permite refletir origem
+    app.use(cors());
+  } else {
+    // normaliza para array
+    const allowed = Array.isArray(corsOption)
+      ? [...corsOption]
+      : corsOption
+        ? [corsOption]
+        : [];
+    if (!allowed.includes(defaultVercelOrigin))
+      allowed.push(defaultVercelOrigin);
+    app.use(cors({ origin: allowed }));
+  }
+} catch (e) {
+  // fallback permissivo (usar apenas em emergências)
+  console.error(
+    "[CORS] Erro ao configurar CORS, usando fallback permissivo",
+    e.message,
+  );
+  app.use(cors());
+}
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ── API REST ──
-app.use('/api', apiRoutes);
+// Rota explícita para compatibilidade: garante existência de /api/loja/:slug
+app.get("/api/loja/:slug", (req, res, next) =>
+  lojaController.getBySlug(req, res, next),
+);
+
+app.use("/api", apiRoutes);
 
 // ── Health Check ──
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime() });
+app.get("/api/health", (_req, res) => {
+  res.json({ status: "ok", uptime: process.uptime() });
 });
 
 // ── Tratamento global de erros ──
@@ -33,13 +64,13 @@ app.use(errorHandler);
 const PORT = config.port;
 
 // Inicializa tabelas no banco
-;(async function initDB() {
-    await paymentDb.init();
-    await ensureUserTables();
-    await ensureCatalogTables();
-  })()
+(async function initDB() {
+  await paymentDb.init();
+  await ensureUserTables();
+  await ensureCatalogTables();
+})()
   .then(() => {
-    app.listen(PORT, '0.0.0.0', () => {
+    app.listen(PORT, "0.0.0.0", () => {
       console.log(`
   ╔═══════════════════════════════════════════╗
   ║        ZapCatálogo  API (backend)         ║
@@ -51,7 +82,7 @@ const PORT = config.port;
     });
   })
   .catch((err) => {
-    console.error('[DB] Erro ao inicializar banco:', err.message);
+    console.error("[DB] Erro ao inicializar banco:", err.message);
     process.exit(1);
   });
 
