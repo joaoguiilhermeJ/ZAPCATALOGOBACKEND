@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.SUPABASE_URL?.trim();
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY?.trim();
+const supabaseBucket = process.env.SUPABASE_BUCKET || "produtos";
 const missingVariables = [
   !supabaseUrl && "SUPABASE_URL",
   !supabaseServiceKey && "SUPABASE_SERVICE_KEY",
@@ -20,9 +21,13 @@ function initializeSupabase() {
 
   if (!globalThis.WebSocket) globalThis.WebSocket = ws;
 
-  return createClient(supabaseUrl, supabaseServiceKey, {
+  const client = createClient(supabaseUrl, supabaseServiceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  console.log("[Supabase] conectado");
+  console.log(`[Supabase] bucket: ${supabaseBucket}`);
+  return client;
 }
 
 export const supabase = initializeSupabase();

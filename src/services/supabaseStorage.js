@@ -1,17 +1,15 @@
 /**
  * SupabaseStorage — Upload e gerenciamento de imagens no Supabase Storage
  *
- * Bucket público configurado por SUPABASE_BUCKET (padrão: "prdutos").
+ * Bucket público configurado por SUPABASE_BUCKET (padrão: "produtos").
  */
 
 import supabase from "../config/supabase.js";
 
+const bucket = process.env.SUPABASE_BUCKET || "produtos";
+
 function getClient() {
   return supabase;
-}
-
-function getBucket() {
-  return process.env.SUPABASE_BUCKET || "prdutos";
 }
 
 export class SupabaseStorageService {
@@ -22,15 +20,13 @@ export class SupabaseStorageService {
    * @param {string} mimetype - Tipo MIME (ex: image/png)
    * @returns {Promise<{publicUrl: string|null}>}
    */
-  async uploadLogo(catalogoId, buffer, mimetype) {
+  async uploadLogo(catalogoId, buffer, mimetype = "image/png") {
     const sb = getClient();
     if (!sb) return { publicUrl: null };
 
     const filePath = `logos/${catalogoId}/logo.png`;
-    const bucket = getBucket();
-
     const { error } = await sb.storage.from(bucket).upload(filePath, buffer, {
-      contentType: mimetype || "image/png",
+      contentType: mimetype,
       upsert: true,
     });
 
@@ -51,7 +47,7 @@ export class SupabaseStorageService {
     if (!sb) return;
 
     await sb.storage
-      .from(getBucket())
+      .from(bucket)
       .remove([`logos/${catalogoId}/logo.png`]);
   }
 
@@ -64,7 +60,12 @@ export class SupabaseStorageService {
    * @param {string} ext - Extensão do arquivo (ex: .jpg)
    * @returns {Promise<{publicUrl: string|null}>}
    */
-  async uploadProductImage(catalogoId, produtoId, buffer, mimetype) {
+  async uploadProductImage(
+    catalogoId,
+    produtoId,
+    buffer,
+    mimetype = "image/jpeg",
+  ) {
     const sb = getClient();
     if (!sb) return { publicUrl: null };
 
@@ -75,12 +76,10 @@ export class SupabaseStorageService {
     };
     const ext = extMap[mimetype] || ".jpg";
     const filePath = `${catalogoId}/${produtoId}${ext}`;
-    const bucket = getBucket();
-
     const { error } = await sb.storage
       .from(bucket)
       .upload(filePath, buffer, {
-        contentType: mimetype || "image/jpeg",
+        contentType: mimetype,
         upsert: true,
       });
 
@@ -129,7 +128,7 @@ export class SupabaseStorageService {
 
     // Tenta .jpg e .png (não sabemos qual extensão foi usada)
     await sb.storage
-      .from(getBucket())
+      .from(bucket)
       .remove([
         `${catalogoId}/${produtoId}.jpg`,
         `${catalogoId}/${produtoId}.png`,
