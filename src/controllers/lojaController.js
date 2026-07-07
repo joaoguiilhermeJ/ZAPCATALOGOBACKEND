@@ -21,14 +21,27 @@ export class LojaController {
       if (!catRes.rowCount) throw new AppError("Catálogo não encontrado", 404);
       const catalogo = catRes.rows[0];
 
-      // Busca produtos
-      const prodRes = await query(
-        `SELECT id, nome, descricao, preco, categoria, imagem_url, variacoes, codigo
-         FROM produtos
-         WHERE catalogo_id = $1
-         ORDER BY created_at ASC`,
-        [catalogo.id],
-      );
+      // Busca produtos ativos. O fallback mantém ambientes antigos funcionando
+      // enquanto a coluna produtos.ativo ainda não foi criada.
+      let prodRes;
+      try {
+        prodRes = await query(
+          `SELECT id, nome, descricao, preco, categoria, imagem_url, variacoes, codigo, ativo
+           FROM produtos
+           WHERE catalogo_id = $1 AND COALESCE(ativo, true) = true
+           ORDER BY created_at ASC`,
+          [catalogo.id],
+        );
+      } catch (err) {
+        if (err?.code !== "42703") throw err;
+        prodRes = await query(
+          `SELECT id, nome, descricao, preco, categoria, imagem_url, variacoes, codigo
+           FROM produtos
+           WHERE catalogo_id = $1
+           ORDER BY created_at ASC`,
+          [catalogo.id],
+        );
+      }
 
       // Monta representação compatível com clientes antigos e novos
       const catalogoPayload = {

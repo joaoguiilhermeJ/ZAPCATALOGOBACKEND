@@ -4,17 +4,23 @@
  */
 
 import { query } from './db.js';
+import crypto from 'crypto';
+
+export function gerarEditToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
 
 export class CatalogoDb {
   /**
    * Cria um novo catálogo
    */
-  async create({ nome_loja, slug, whatsapp, cor_tema, logo_url }) {
+  async create({ nome_loja, slug, whatsapp, cor_tema, logo_url, edit_token }) {
+    const token = edit_token || gerarEditToken();
     const result = await query(
-      `INSERT INTO catalogos (nome_loja, slug, whatsapp, cor_tema, logo_url)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO catalogos (nome_loja, slug, whatsapp, cor_tema, logo_url, edit_token)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [nome_loja, slug, whatsapp || null, cor_tema || '#128C7E', logo_url || null]
+      [nome_loja, slug, whatsapp || null, cor_tema || '#128C7E', logo_url || null, token]
     );
     return result.rows[0] || null;
   }

@@ -25,6 +25,65 @@ function normalizarCabecalho(valor) {
     .trim();
 }
 
+function obterEditToken(req) {
+  return String(
+    req.body?.edit_token ||
+    req.body?.token ||
+    req.query?.edit_token ||
+    req.query?.token ||
+    req.get('x-edit-token') ||
+    ''
+  ).trim();
+}
+
+function uuidValido(valor) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(valor || ''));
+}
+
+async function validarCatalogoEdicao(req) {
+  const editToken = obterEditToken(req);
+  const catalogoId = req.body?.catalogo_id || req.body?.catalogId || req.query?.catalogo_id || req.query?.catalogId;
+  const slug = req.body?.slug || req.query?.slug;
+
+  if (!editToken) {
+    throw new AppError('edit_token obrigatório para alterar produtos', 401);
+  }
+  if (!catalogoId && !slug) {
+    throw new AppError('catalogo_id ou slug obrigatório para alterar produtos', 400);
+  }
+  if (catalogoId && !uuidValido(catalogoId)) {
+    throw new AppError('catalogo_id inválido', 400);
+  }
+
+  const result = await query(
+    `SELECT id, slug FROM catalogos
+     WHERE edit_token = $1 AND ($2::uuid IS NOT NULL AND id = $2::uuid OR $3::text IS NOT NULL AND slug = $3::text)`,
+    [editToken, catalogoId || null, slug || null]
+  );
+  if (!result.rowCount) {
+    throw new AppError('Token inválido para este catálogo', 403);
+  }
+  return result.rows[0];
+}
+
+async function validarProdutoEdicao(produtoId, editToken) {
+  if (!editToken) {
+    throw new AppError('edit_token obrigatório para alterar imagem do produto', 401);
+  }
+
+  const result = await query(
+    `SELECT p.id, p.catalogo_id
+       FROM produtos p
+       JOIN catalogos c ON c.id = p.catalogo_id
+      WHERE p.id = $1 AND c.edit_token = $2`,
+    [produtoId, editToken]
+  );
+  if (!result.rowCount) {
+    throw new AppError('Token inválido ou produto não encontrado', 403);
+  }
+  return result.rows[0];
+}
+
 export class ProdutoUploadController {
   /**
    * Garante que o lojista teste e catálogo teste existem no banco
@@ -37,8 +96,8 @@ export class ProdutoUploadController {
     `, [LOJISTA_TESTE_ID]);
 
     await query(`
-      INSERT INTO catalogos (id, nome_loja, slug, usuario_id)
-      VALUES ($1, 'Minha Loja', 'minha-loja-' || substr(md5(random()::text), 1, 8), $2)
+      INSERT INTO catalogos (id, nome_loja, slug, usuario_id, edit_token)
+      VALUES ($1, 'Minha Loja', 'minha-loja-' || substr(md5(random()::text), 1, 8), $2, encode(gen_random_bytes(32), 'hex'))
       ON CONFLICT (id) DO NOTHING
     `, [CATALOGO_TESTE_ID, LOJISTA_TESTE_ID]);
 
@@ -54,6 +113,8 @@ export class ProdutoUploadController {
         throw new AppError('Nenhum arquivo enviado. Envie uma planilha .xlsx ou .xls', 400);
       }
 
+      const catalogo = await validarCatalogoEdicao(req);
+      const catalogId = catalogo.id;
       const buffer = req.file.buffer;
       const filename = req.file.originalname;
 
@@ -159,18 +220,6 @@ export class ProdutoUploadController {
         throw new AppError('Nenhum produto encontrado na planilha. Verifique se há dados a partir da linha 2.', 400);
       }
 
-      // Salva no banco atrelado ao catálogo de teste
-      // Usa o catálogo informado (slug ou id) – o cliente deve enviar catalogId no body
-      const catalogId = req.body.catalogId;
-      if (!catalogId) {
-        throw new AppError('catalogId ausente no corpo da requisição', 400);
-      }
-      // Verifica se o catalogo existe
-      const catalogCheck = await query('SELECT id FROM catalogos WHERE id = $1', [catalogId]);
-      if (!catalogCheck.rowCount) {
-        throw new AppError('Catálogo não encontrado para o catalogId fornecido', 404);
-      }
-
       // Apaga produtos antigos do catálogo (se houver)
       await query('DELETE FROM produtos WHERE catalogo_id = $1', [catalogId]);
 
@@ -225,18 +274,11 @@ export class ProdutoUploadController {
       if (!req.file) {
         throw new AppError('Envie uma imagem no campo "imagem"', 400);
       }
-      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.params.id)) {
+      if (!uuidValido(req.params.id)) {
         throw new AppError('ID de produto inválido', 400);
       }
 
-      const productResult = await query(
-        'SELECT id, catalogo_id FROM produtos WHERE id = $1',
-        [req.params.id]
-      );
-      const produto = productResult.rows[0];
-      if (!produto) {
-        throw new AppError('Produto não encontrado', 404);
-      }
+      const produto = await validarProdutoEdicao(req.params.id, obterEditToken(req));
 
       const uploaded = await supabaseStorage.uploadProductImage(
         produto.catalogo_id,

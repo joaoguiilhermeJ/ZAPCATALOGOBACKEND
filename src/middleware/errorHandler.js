@@ -12,6 +12,16 @@ export class AppError extends Error {
 }
 
 export function errorHandler(err, _req, res, _next) {
+  if (err?.name === 'MulterError') {
+    const message = err.code === 'LIMIT_FILE_SIZE'
+      ? 'Arquivo excede o limite permitido.'
+      : 'Erro ao processar upload.';
+    return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({
+      success: false,
+      error: message,
+    });
+  }
+
   const statusCode = err.statusCode || 500;
   const message = err.isOperational ? err.message : 'Erro interno do servidor';
 

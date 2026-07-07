@@ -8,6 +8,16 @@ import supabaseStorage from "../services/supabaseStorage.js";
 import { AppError } from "../middleware/errorHandler.js";
 // import prisma from '../services/prisma.js'; // removed – not used
 
+function frontendOrigin(req) {
+  return (
+    process.env.FRONTEND_URL ||
+    process.env.PUBLIC_BASE_URL ||
+    process.env.BASE_URL ||
+    req.get("origin") ||
+    "https://zapcatalogo-weld.vercel.app"
+  ).replace(/\/$/, "");
+}
+
 export class OnboardingController {
   /**
    * POST /api/onboarding
@@ -52,12 +62,21 @@ export class OnboardingController {
         cor_tema,
         logo_url: logoUrl,
       });
+      const origin = frontendOrigin(req);
+      const catalogoUrl = `${origin}/c/${encodeURIComponent(created.slug)}`;
+      const adminUrl = `${origin}/admin/${encodeURIComponent(created.slug)}?token=${encodeURIComponent(created.edit_token)}`;
 
       res.status(201).json({
         success: true,
+        catalogo_url: catalogoUrl,
+        admin_url: adminUrl,
+        edit_token: created.edit_token,
         catalogo: {
           id: created.id,
           slug: created.slug,
+          catalogo_url: catalogoUrl,
+          admin_url: adminUrl,
+          edit_token: created.edit_token,
         },
       });
     } catch (err) {

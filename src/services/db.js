@@ -6,6 +6,11 @@ import { Pool } from '@neondatabase/serverless';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
+if (!DATABASE_URL && process.env.NODE_ENV === 'production') {
+  console.error('[DB] DATABASE_URL não configurada em produção. Abortando inicialização.');
+  process.exit(1);
+}
+
 let pool = null;
 
 function getPool() {
@@ -67,6 +72,8 @@ export async function ensureTables() {
  * Cria a tabela de catálogos + produtos se não existir
  */
 export async function ensureCatalogTables() {
+  await query(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`);
+
   await query(`
     CREATE TABLE IF NOT EXISTS catalogos (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -75,6 +82,7 @@ export async function ensureCatalogTables() {
       whatsapp TEXT,
       cor_tema TEXT DEFAULT '#128C7E',
       logo_url TEXT,
+      edit_token TEXT,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW()
     );
@@ -92,6 +100,7 @@ export async function ensureCatalogTables() {
       codigo TEXT,
       estoque TEXT,
       imagem_url TEXT,
+      ativo BOOLEAN DEFAULT true,
       imagem_updated_at TIMESTAMP,
       created_at TIMESTAMP DEFAULT NOW()
     );
@@ -107,6 +116,24 @@ export async function ensureCatalogTables() {
 
   await query(`
     ALTER TABLE produtos ADD COLUMN IF NOT EXISTS variacoes TEXT;
+  `);
+
+  await query(`
+    ALTER TABLE produtos ADD COLUMN IF NOT EXISTS ativo BOOLEAN DEFAULT true;
+  `);
+
+  await query(`
+    ALTER TABLE catalogos ADD COLUMN IF NOT EXISTS edit_token TEXT;
+  `);
+
+  await query(`
+    UPDATE catalogos
+       SET edit_token = encode(gen_random_bytes(32), 'hex')
+     WHERE edit_token IS NULL OR edit_token = '';
+  `);
+
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_catalogos_edit_token ON catalogos(edit_token);
   `);
 
   await query(`
@@ -132,6 +159,8 @@ export async function ensureCatalogTables() {
  * Cria a tabela de usuários se não existir
  */
 export async function ensureUserTables() {
+  await query(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`);
+
   await query(`
     CREATE TABLE IF NOT EXISTS usuarios (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
