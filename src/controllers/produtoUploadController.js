@@ -25,6 +25,19 @@ function normalizarCabecalho(valor) {
     .trim();
 }
 
+function normalizarNomeProduto(valor) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizarCodigo(valor) {
+  return String(valor || '').trim().toLowerCase();
+}
+
 function obterEditToken(req) {
   return String(
     req.body?.edit_token ||
@@ -220,35 +233,90 @@ export class ProdutoUploadController {
         throw new AppError('Nenhum produto encontrado na planilha. Verifique se há dados a partir da linha 2.', 400);
       }
 
-      // Apaga produtos antigos do catálogo (se houver)
-      await query('DELETE FROM produtos WHERE catalogo_id = $1', [catalogId]);
+      const existentesResult = await query(
+        `SELECT id, nome, codigo, imagem_url, imagem_updated_at, ativo
+         FROM produtos
+         WHERE catalogo_id = $1
+         ORDER BY created_at ASC`,
+        [catalogId]
+      );
+      const existentes = existentesResult.rows;
+      const porCodigo = new Map();
+      const porNome = new Map();
+      existentes.forEach((produto) => {
+        const codigo = normalizarCodigo(produto.codigo);
+        if (codigo && !porCodigo.has(codigo)) porCodigo.set(codigo, produto);
+        const nome = normalizarNomeProduto(produto.nome);
+        if (nome && !porNome.has(nome)) porNome.set(nome, produto);
+      });
 
-      // Insere lote
-      const values = [];
-      const placeholders = [];
-      let idx = 1;
+      const usados = new Set();
+      const importados = [];
 
       for (const p of produtos) {
-        placeholders.push(`($${idx}, $${idx+1}, $${idx+2}, $${idx+3}, $${idx+4}, $${idx+5}, $${idx+6}, $${idx+7})`);
-        values.push(
-          catalogId,
-          p.nome,
-          p.descricao || null,
-          p.preco || null,
-          p.categoria || null,
-          p.variacoes || null,
-          p.codigo || null,
-          p.estoque || null
+        const codigo = normalizarCodigo(p.codigo);
+        const nome = normalizarNomeProduto(p.nome);
+        let existente = codigo ? porCodigo.get(codigo) : null;
+        if (!existente && nome) existente = porNome.get(nome);
+
+        if (existente && !usados.has(existente.id)) {
+          const updated = await query(
+            `UPDATE produtos
+             SET nome = $1,
+                 descricao = $2,
+                 preco = $3,
+                 categoria = $4,
+                 variacoes = $5,
+                 codigo = $6,
+                 estoque = $7
+             WHERE id = $8
+             RETURNING *`,
+            [
+              p.nome,
+              p.descricao || null,
+              p.preco || null,
+              p.categoria || null,
+              p.variacoes || null,
+              p.codigo || null,
+              p.estoque || null,
+              existente.id,
+            ]
+          );
+          usados.add(existente.id);
+          importados.push(updated.rows[0]);
+          continue;
+        }
+
+        const inserted = await query(
+          `INSERT INTO produtos (catalogo_id, nome, descricao, preco, categoria, variacoes, codigo, estoque)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           RETURNING *`,
+          [
+            catalogId,
+            p.nome,
+            p.descricao || null,
+            p.preco || null,
+            p.categoria || null,
+            p.variacoes || null,
+            p.codigo || null,
+            p.estoque || null,
+          ]
         );
-        idx += 8;
+        usados.add(inserted.rows[0].id);
+        importados.push(inserted.rows[0]);
       }
 
-      const inserted = await query(
-        `INSERT INTO produtos (catalogo_id, nome, descricao, preco, categoria, variacoes, codigo, estoque)
-         VALUES ${placeholders.join(', ')}
-         RETURNING *`,
-        values
-      );
+      const ausentes = existentes
+        .filter((produto) => !usados.has(produto.id))
+        .map((produto) => produto.id);
+      if (ausentes.length) {
+        await query(
+          `UPDATE produtos
+           SET ativo = false
+           WHERE catalogo_id = $1 AND id = ANY($2::uuid[])`,
+          [catalogId, ausentes]
+        );
+      }
 
       console.log(`[Upload] ${produtos.length} produtos salvos do arquivo "${filename}"`);
 
@@ -257,7 +325,7 @@ export class ProdutoUploadController {
         filename,
         totalLinhas,
         linhasValidas,
-        produtos: inserted.rows,
+        produtos: importados,
         count: produtos.length,
       });
 
