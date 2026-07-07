@@ -88,6 +88,7 @@ export async function ensureCatalogTables() {
       descricao TEXT,
       preco TEXT,
       categoria TEXT,
+      variacoes TEXT,
       codigo TEXT,
       estoque TEXT,
       imagem_url TEXT,
@@ -102,6 +103,10 @@ export async function ensureCatalogTables() {
 
   await query(`
     ALTER TABLE produtos ADD COLUMN IF NOT EXISTS imagem_updated_at TIMESTAMP;
+  `);
+
+  await query(`
+    ALTER TABLE produtos ADD COLUMN IF NOT EXISTS variacoes TEXT;
   `);
 
   await query(`

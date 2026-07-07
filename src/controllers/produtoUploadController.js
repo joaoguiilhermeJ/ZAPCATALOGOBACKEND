@@ -4,7 +4,7 @@
  * POST /api/produtos/upload
  *   -> Recebe .xlsx/.xls via multipart
  *   -> Lê com exceljs (pula cabeçalho)
- *   -> Extrai produtos (Nome, Preço, Descrição, Categoria, Código, Estoque)
+ *   -> Extrai produtos (Nome, Preço, Descrição, Categoria, Variações, Código, Estoque)
  *   -> Salva no banco atrelado a um lojista genérico de teste
  *   -> Retorna JSON com produtos extraídos + metadados
  */
@@ -16,6 +16,14 @@ import supabaseStorage from '../services/supabaseStorage.js';
 
 const LOJISTA_TESTE_ID = '00000000-0000-0000-0000-000000000001'; // kept for legacy fallback
 const CATALOGO_TESTE_ID = '00000000-0000-0000-0000-000000000001';
+
+function normalizarCabecalho(valor) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
 
 export class ProdutoUploadController {
   /**
@@ -94,12 +102,13 @@ export class ProdutoUploadController {
       const headerRow = worksheet.getRow(1);
       const colMap = {};
       headerRow.eachCell((cell, colNumber) => {
-        const val = (cell.value || '').toString().toLowerCase().trim();
-        if (/nome/.test(val) || /produto/.test(val)) colMap.nome = colNumber;
-        if (/preço|preco/.test(val)) colMap.preco = colNumber;
-        if (/descri/.test(val)) colMap.descricao = colNumber;
-        if (/categ/.test(val)) colMap.categoria = colNumber;
-        if (/código|codigo/.test(val)) colMap.codigo = colNumber;
+        const val = normalizarCabecalho(cell.value);
+        if (['nome do produto', 'produto', 'nome'].includes(val)) colMap.nome = colNumber;
+        if (['preco', 'valor'].includes(val)) colMap.preco = colNumber;
+        if (['descricao'].includes(val)) colMap.descricao = colNumber;
+        if (val === 'categoria') colMap.categoria = colNumber;
+        if (['variacoes', 'sabores', 'opcoes', 'tamanhos'].includes(val)) colMap.variacoes = colNumber;
+        if (['codigo'].includes(val)) colMap.codigo = colNumber;
         if (/estoque|qtd/.test(val)) colMap.estoque = colNumber;
       });
 
@@ -138,6 +147,7 @@ export class ProdutoUploadController {
           preco: cellValue('preco'),
           descricao: cellValue('descricao'),
           categoria: cellValue('categoria'),
+          variacoes: cellValue('variacoes'),
           codigo: cellValue('codigo'),
           estoque: cellValue('estoque'),
         };
@@ -170,21 +180,22 @@ export class ProdutoUploadController {
       let idx = 1;
 
       for (const p of produtos) {
-        placeholders.push(`($${idx}, $${idx+1}, $${idx+2}, $${idx+3}, $${idx+4}, $${idx+5}, $${idx+6})`);
+        placeholders.push(`($${idx}, $${idx+1}, $${idx+2}, $${idx+3}, $${idx+4}, $${idx+5}, $${idx+6}, $${idx+7})`);
         values.push(
           catalogId,
           p.nome,
           p.descricao || null,
           p.preco || null,
           p.categoria || null,
+          p.variacoes || null,
           p.codigo || null,
           p.estoque || null
         );
-        idx += 7;
+        idx += 8;
       }
 
       const inserted = await query(
-        `INSERT INTO produtos (catalogo_id, nome, descricao, preco, categoria, codigo, estoque)
+        `INSERT INTO produtos (catalogo_id, nome, descricao, preco, categoria, variacoes, codigo, estoque)
          VALUES ${placeholders.join(', ')}
          RETURNING *`,
         values

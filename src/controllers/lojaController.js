@@ -23,7 +23,10 @@ export class LojaController {
 
       // Busca produtos
       const prodRes = await query(
-        "SELECT * FROM produtos WHERE catalogo_id = $1",
+        `SELECT id, nome, descricao, preco, categoria, imagem_url, variacoes, codigo
+         FROM produtos
+         WHERE catalogo_id = $1
+         ORDER BY created_at ASC`,
         [catalogo.id],
       );
 

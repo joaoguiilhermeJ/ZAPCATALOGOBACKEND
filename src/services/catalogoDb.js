@@ -93,22 +93,23 @@ export class ProdutoDb {
     let idx = 1;
 
     for (const p of produtos) {
-      placeholders.push(`($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6}, $${idx + 7})`);
+      placeholders.push(`($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6}, $${idx + 7}, $${idx + 8})`);
       values.push(
         catalogoId,
         p.nome || 'Produto',
         p.desc || null,
         p.preco || null,
         p.categoria || null,
+        p.variacoes || null,
         p.codigo || null,
         p.estoque || null,
         p.imagem_url || null
       );
-      idx += 8;
+      idx += 9;
     }
 
     const result = await query(
-      `INSERT INTO produtos (catalogo_id, nome, descricao, preco, categoria, codigo, estoque, imagem_url)
+      `INSERT INTO produtos (catalogo_id, nome, descricao, preco, categoria, variacoes, codigo, estoque, imagem_url)
        VALUES ${placeholders.join(', ')}
        RETURNING *`,
       values
