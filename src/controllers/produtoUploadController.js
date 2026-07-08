@@ -102,16 +102,26 @@ export class ProdutoUploadController {
    * Garante que o lojista teste e catálogo teste existem no banco
    */
   async ensureTestSeed() {
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('[Seed] Seed de teste ignorado em produção');
+      return;
+    }
+
     await query(`
       INSERT INTO usuarios (id, email, senha_hash, nome)
       VALUES ($1, 'teste@zapcatalogo.app', '$2a$10$placeholder', 'Lojista Teste')
-      ON CONFLICT (id) DO NOTHING
+      ON CONFLICT (id) DO UPDATE
+      SET email = EXCLUDED.email,
+          nome = EXCLUDED.nome
     `, [LOJISTA_TESTE_ID]);
 
     await query(`
       INSERT INTO catalogos (id, nome_loja, slug, usuario_id, edit_token)
       VALUES ($1, 'Minha Loja', 'minha-loja-' || substr(md5(random()::text), 1, 8), $2, encode(gen_random_bytes(32), 'hex'))
-      ON CONFLICT (id) DO NOTHING
+      ON CONFLICT (id) DO UPDATE
+      SET usuario_id = COALESCE(catalogos.usuario_id, EXCLUDED.usuario_id),
+          edit_token = COALESCE(NULLIF(catalogos.edit_token, ''), EXCLUDED.edit_token),
+          updated_at = NOW()
     `, [CATALOGO_TESTE_ID, LOJISTA_TESTE_ID]);
 
     console.log('[Seed] Lojista e catálogo de teste garantidos');
@@ -288,8 +298,8 @@ export class ProdutoUploadController {
         }
 
         const inserted = await query(
-          `INSERT INTO produtos (catalogo_id, nome, descricao, preco, categoria, variacoes, codigo, estoque)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          `INSERT INTO produtos (catalogo_id, nome, descricao, preco, categoria, variacoes, codigo, estoque, ativo)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
            RETURNING *`,
           [
             catalogId,

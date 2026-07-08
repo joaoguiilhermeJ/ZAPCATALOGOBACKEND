@@ -123,13 +123,31 @@ export async function ensureCatalogTables() {
   `);
 
   await query(`
+    ALTER TABLE produtos ALTER COLUMN ativo SET DEFAULT true;
+  `);
+
+  await query(`
+    UPDATE produtos
+       SET ativo = true
+     WHERE ativo IS NULL;
+  `);
+
+  await query(`
     ALTER TABLE catalogos ADD COLUMN IF NOT EXISTS edit_token TEXT;
+  `);
+
+  await query(`
+    ALTER TABLE catalogos ALTER COLUMN edit_token SET DEFAULT encode(gen_random_bytes(32), 'hex');
   `);
 
   await query(`
     UPDATE catalogos
        SET edit_token = encode(gen_random_bytes(32), 'hex')
      WHERE edit_token IS NULL OR edit_token = '';
+  `);
+
+  await query(`
+    ALTER TABLE catalogos ALTER COLUMN edit_token SET NOT NULL;
   `);
 
   await query(`

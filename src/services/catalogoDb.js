@@ -18,11 +18,15 @@ export class CatalogoDb {
     const token = edit_token || gerarEditToken();
     const result = await query(
       `INSERT INTO catalogos (nome_loja, slug, whatsapp, cor_tema, logo_url, edit_token)
-       VALUES ($1, $2, $3, $4, $5, $6)
+       VALUES ($1, $2, $3, $4, $5, COALESCE(NULLIF($6, ''), encode(gen_random_bytes(32), 'hex')))
        RETURNING *`,
       [nome_loja, slug, whatsapp || null, cor_tema || '#128C7E', logo_url || null, token]
     );
-    return result.rows[0] || null;
+    const catalogo = result.rows[0] || null;
+    if (!catalogo?.edit_token) {
+      throw new Error('Falha ao criar catálogo com token de edição');
+    }
+    return catalogo;
   }
 
   /**
@@ -99,7 +103,7 @@ export class ProdutoDb {
     let idx = 1;
 
     for (const p of produtos) {
-      placeholders.push(`($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6}, $${idx + 7}, $${idx + 8})`);
+      placeholders.push(`($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6}, $${idx + 7}, $${idx + 8}, true)`);
       values.push(
         catalogoId,
         p.nome || 'Produto',
@@ -115,7 +119,7 @@ export class ProdutoDb {
     }
 
     const result = await query(
-      `INSERT INTO produtos (catalogo_id, nome, descricao, preco, categoria, variacoes, codigo, estoque, imagem_url)
+      `INSERT INTO produtos (catalogo_id, nome, descricao, preco, categoria, variacoes, codigo, estoque, imagem_url, ativo)
        VALUES ${placeholders.join(', ')}
        RETURNING *`,
       values
