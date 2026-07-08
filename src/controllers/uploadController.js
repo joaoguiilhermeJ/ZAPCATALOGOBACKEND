@@ -9,22 +9,27 @@ import { AppError } from '../middleware/errorHandler.js';
 export class UploadController {
   async processUpload(req, res, next) {
     try {
+      console.log('[UploadPreview] POST /api/upload recebido', {
+        filename: req.file?.originalname || null,
+        size: req.file?.size || 0,
+        mimetype: req.file?.mimetype || null,
+      });
+
       if (!req.file) {
         throw new AppError('Nenhum arquivo enviado', 400);
       }
 
-      let result;
-
-      if (req.file.buffer) {
-        // Memory storage (Vercel / serverless) — lê do buffer
-        result = spreadsheetService.readSpreadsheetFromBuffer(req.file.buffer);
-      } else if (req.file.path) {
-        // Disk storage (local) — lê do caminho
-        result = spreadsheetService.readSpreadsheet(req.file.path);
-        spreadsheetService.cleanup(req.file.path);
-      } else {
+      if (!req.file.buffer) {
         throw new AppError('Formato de arquivo não suportado', 400);
       }
+
+      const result = spreadsheetService.readSpreadsheetFromBuffer(req.file.buffer);
+
+      console.log('[UploadPreview] Planilha validada', {
+        filename: req.file.originalname,
+        size: req.file.size,
+        rowCount: result.rowCount,
+      });
 
       res.json({
         success: true,
@@ -32,10 +37,11 @@ export class UploadController {
         ...result,
       });
     } catch (error) {
-      // Limpa arquivo mesmo em caso de erro (apenas disk storage)
-      if (req.file?.path) {
-        spreadsheetService.cleanup(req.file.path);
-      }
+      console.error('[UploadPreview] Erro ao processar planilha', {
+        filename: req.file?.originalname || null,
+        size: req.file?.size || 0,
+        message: error.message,
+      });
       next(error);
     }
   }

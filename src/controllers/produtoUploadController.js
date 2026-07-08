@@ -132,6 +132,12 @@ export class ProdutoUploadController {
    */
   async upload(req, res, next) {
     try {
+      console.log('[ProdutosUpload] POST /api/produtos/upload recebido', {
+        filename: req.file?.originalname || null,
+        size: req.file?.size || 0,
+        mimetype: req.file?.mimetype || null,
+      });
+
       if (!req.file) {
         throw new AppError('Nenhum arquivo enviado. Envie uma planilha .xlsx ou .xls', 400);
       }
@@ -328,7 +334,12 @@ export class ProdutoUploadController {
         );
       }
 
-      console.log(`[Upload] ${produtos.length} produtos salvos do arquivo "${filename}"`);
+      console.log('[ProdutosUpload] Produtos importados', {
+        filename,
+        size: req.file.size,
+        catalogo_id: catalogId,
+        count: produtos.length,
+      });
 
       res.status(200).json({
         success: true,
@@ -340,6 +351,11 @@ export class ProdutoUploadController {
       });
 
     } catch (error) {
+      console.error('[ProdutosUpload] Erro ao importar planilha', {
+        filename: req.file?.originalname || null,
+        size: req.file?.size || 0,
+        message: error.message,
+      });
       next(error);
     }
   }

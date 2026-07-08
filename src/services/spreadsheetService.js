@@ -5,6 +5,7 @@
 import xlsx from 'xlsx';
 import fs from 'fs';
 import path from 'path';
+import { AppError } from '../middleware/errorHandler.js';
 
 export class SpreadsheetService {
   /**
@@ -29,6 +30,7 @@ export class SpreadsheetService {
    * Extrai as colunas da planilha
    */
   getColumns(worksheet) {
+    if (!worksheet?.['!ref']) return [];
     const range = xlsx.utils.decode_range(worksheet['!ref']);
     const columns = [];
 
@@ -122,8 +124,14 @@ export class SpreadsheetService {
    */
   readSpreadsheetFromBuffer(buffer) {
     const workbook = xlsx.read(buffer, { type: 'buffer' });
+    if (!workbook.SheetNames.length) {
+      throw new AppError('Planilha vazia ou sem abas válidas', 400);
+    }
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
+    if (!worksheet?.['!ref']) {
+      throw new AppError('Planilha vazia. Preencha os produtos a partir da primeira aba.', 400);
+    }
     const data = xlsx.utils.sheet_to_json(worksheet);
 
     return {
