@@ -18,6 +18,18 @@ function frontendOrigin(req) {
   ).replace(/\/$/, "");
 }
 
+function normalizarWhatsApp(numero) {
+  const digits = String(numero || "").replace(/\D/g, "");
+  if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) return digits;
+  if (digits.length === 11) return `55${digits}`;
+  if (digits.length === 10) return `55${digits.slice(0, 2)}9${digits.slice(2)}`;
+  return digits;
+}
+
+function whatsappValido(numero) {
+  return /^55\d{2}9\d{8}$/.test(numero);
+}
+
 export class OnboardingController {
   /**
    * POST /api/onboarding
@@ -34,6 +46,11 @@ export class OnboardingController {
           "Campos nome, whatsapp e cor_tema são obrigatórios",
           400,
         );
+      }
+
+      const whatsappNormalizado = normalizarWhatsApp(whatsapp);
+      if (!whatsappValido(whatsappNormalizado)) {
+        throw new AppError("Informe um WhatsApp válido com DDD.", 400);
       }
 
       // gera slug amigável a partir do nome da loja
@@ -58,7 +75,7 @@ export class OnboardingController {
       const created = await catalogoDb.CatalogoDb.create({
         nome_loja: nome_loja.trim(),
         slug,
-        whatsapp,
+        whatsapp: whatsappNormalizado,
         cor_tema,
         logo_url: logoUrl,
       });
