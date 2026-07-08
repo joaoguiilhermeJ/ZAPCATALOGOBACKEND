@@ -7,6 +7,7 @@ import { AppError } from "../middleware/errorHandler.js";
 export class LojaController {
   /**
    * GET /api/loja/:slug
+   * GET /api/catalogo/:slug
    * Retorna dados da loja + produtos
    */
   async getBySlug(req, res, next) {
@@ -68,10 +69,11 @@ export class LojaController {
         success: true,
         catalogo: catalogoPayload,
         produtos: prodRes.rows,
-        // Forma compatível com a sugestão (payload.data.lojista / payload.data.produtos)
         data: {
-          lojista: lojistaPayload,
+          ...catalogoPayload,
           produtos: prodRes.rows,
+          // Mantém compatibilidade com clientes antigos que esperavam data.lojista.
+          lojista: lojistaPayload,
         },
       });
     } catch (err) {

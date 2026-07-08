@@ -59,8 +59,11 @@ app.get("/health", healthCheck);
 app.get("/api/health", healthCheck);
 
 // ── API REST ──
-// Rota explícita para compatibilidade: garante existência de /api/loja/:slug
+// Rotas públicas explícitas para compatibilidade com clientes e deploys antigos.
 app.get("/api/loja/:slug", (req, res, next) =>
+  lojaController.getBySlug(req, res, next),
+);
+app.get("/api/catalogo/:slug", (req, res, next) =>
   lojaController.getBySlug(req, res, next),
 );
 
