@@ -37,4 +37,8 @@ router.patch("/admin/produtos/:id/ativo", (req, res, next) =>
   adminController.updateProdutoAtivo(req, res, next)
 );
 
+router.patch("/admin/produtos/:id/disponibilidade", (req, res, next) =>
+  adminController.updateProdutoDisponibilidade(req, res, next)
+);
+
 export default router;

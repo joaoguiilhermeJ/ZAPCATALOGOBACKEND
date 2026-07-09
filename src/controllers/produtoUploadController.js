@@ -304,8 +304,8 @@ export class ProdutoUploadController {
         }
 
         const inserted = await query(
-          `INSERT INTO produtos (catalogo_id, nome, descricao, preco, categoria, variacoes, codigo, estoque, ativo)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
+          `INSERT INTO produtos (catalogo_id, nome, descricao, preco, categoria, variacoes, codigo, estoque, ativo, disponivel, motivo_indisponivel)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, true, null)
            RETURNING *`,
           [
             catalogId,

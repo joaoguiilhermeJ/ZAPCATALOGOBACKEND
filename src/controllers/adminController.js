@@ -95,7 +95,7 @@ export class AdminController {
       const token = exigirToken(req);
       const catalogo = await buscarCatalogoPorToken(req.params.slug, token);
       const produtos = await query(
-        `SELECT id, catalogo_id, nome, descricao, preco, categoria, variacoes, codigo, estoque, imagem_url, ativo, created_at
+        `SELECT id, catalogo_id, nome, descricao, preco, categoria, variacoes, codigo, estoque, imagem_url, ativo, disponivel, motivo_indisponivel, created_at
            FROM produtos
           WHERE catalogo_id = $1
           ORDER BY created_at ASC`,
@@ -136,8 +136,11 @@ export class AdminController {
         "variacoes",
         "imagem_url",
         "ativo",
+        "disponivel",
+        "motivo_indisponivel",
       ]);
       if (fields.ativo !== undefined) fields.ativo = parseBoolean(fields.ativo);
+      if (fields.disponivel !== undefined) fields.disponivel = parseBoolean(fields.disponivel);
       const produto = await updatePorId("produtos", req.params.id, fields);
       res.json({ success: true, produto });
     } catch (err) {
@@ -180,6 +183,19 @@ export class AdminController {
       await buscarProdutoPorToken(req.params.id, token);
       const ativo = parseBoolean(req.body?.ativo);
       const produto = await updatePorId("produtos", req.params.id, { ativo });
+      res.json({ success: true, produto });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateProdutoDisponibilidade(req, res, next) {
+    try {
+      const token = exigirToken(req);
+      await buscarProdutoPorToken(req.params.id, token);
+      const fields = camposPermitidos(req.body, ["disponivel", "motivo_indisponivel"]);
+      if (fields.disponivel !== undefined) fields.disponivel = parseBoolean(fields.disponivel);
+      const produto = await updatePorId("produtos", req.params.id, fields);
       res.json({ success: true, produto });
     } catch (err) {
       next(err);

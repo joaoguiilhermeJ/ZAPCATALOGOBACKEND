@@ -101,6 +101,8 @@ export async function ensureCatalogTables() {
       estoque TEXT,
       imagem_url TEXT,
       ativo BOOLEAN DEFAULT true,
+      disponivel BOOLEAN DEFAULT true,
+      motivo_indisponivel TEXT,
       imagem_updated_at TIMESTAMP,
       created_at TIMESTAMP DEFAULT NOW()
     );
@@ -123,13 +125,31 @@ export async function ensureCatalogTables() {
   `);
 
   await query(`
+    ALTER TABLE produtos ADD COLUMN IF NOT EXISTS disponivel BOOLEAN DEFAULT true;
+  `);
+
+  await query(`
+    ALTER TABLE produtos ADD COLUMN IF NOT EXISTS motivo_indisponivel TEXT;
+  `);
+
+  await query(`
     ALTER TABLE produtos ALTER COLUMN ativo SET DEFAULT true;
+  `);
+
+  await query(`
+    ALTER TABLE produtos ALTER COLUMN disponivel SET DEFAULT true;
   `);
 
   await query(`
     UPDATE produtos
        SET ativo = true
      WHERE ativo IS NULL;
+  `);
+
+  await query(`
+    UPDATE produtos
+       SET disponivel = true
+     WHERE disponivel IS NULL;
   `);
 
   await query(`

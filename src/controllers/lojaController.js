@@ -27,7 +27,7 @@ export class LojaController {
       let prodRes;
       try {
         prodRes = await query(
-          `SELECT id, nome, descricao, preco, categoria, imagem_url, variacoes, codigo, ativo
+          `SELECT id, nome, descricao, preco, categoria, imagem_url, variacoes, ativo, disponivel, motivo_indisponivel
            FROM produtos
            WHERE catalogo_id = $1 AND COALESCE(ativo, true) = true
            ORDER BY created_at ASC`,
